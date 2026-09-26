@@ -27,8 +27,16 @@ async def speak(text: str) -> None:
     path = Path(tempfile.mktemp(suffix=".mp3"))
     try:
         await edge_tts.Communicate(text, VOICE).save(str(path))
+        # volume=100 + 6dB boost so TTS stays louder than other apps
         subprocess.run(
-            ["mpv", "--no-video", "--really-quiet", str(path)],
+            [
+                "mpv",
+                "--no-video",
+                "--really-quiet",
+                "--volume=100",
+                "--af=volume=6dB",
+                str(path),
+            ],
             check=False,
         )
     finally:
