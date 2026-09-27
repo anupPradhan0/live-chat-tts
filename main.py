@@ -52,7 +52,15 @@ def main() -> None:
     print(f"Listening to chat for video {vid}", flush=True)
     print("Ctrl+C to stop.\n", flush=True)
 
-    chat = pytchat.create(video_id=vid)
+    while True:
+        try:
+            chat = pytchat.create(video_id=vid)
+            break
+        except Exception as e:
+            print(f"Chat not available yet ({type(e).__name__}), retrying in 10s...", flush=True)
+            time.sleep(10)
+
+    print("Connected to chat.\n", flush=True)
     while chat.is_alive():
         for c in chat.get().sync_items():
             line = f"{c.author.name} says {c.message}"
