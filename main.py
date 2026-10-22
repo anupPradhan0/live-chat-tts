@@ -7,15 +7,28 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 from pathlib import Path
 
 import edge_tts
+import emoji
 import pytchat
 from aiohttp import ClientError
 from edge_tts.exceptions import EdgeTTSException
 
 # ponytail: one voice; swap voice= if you want a different accent
 VOICE = "en-US-JennyNeural"
+
+
+def speech_text(message: str) -> str:
+    """Remove YouTube emoji codes, Unicode emojis, and invisible formatting."""
+    message = re.sub(r":[\w+-]+:", " ", message)
+    message = emoji.replace_emoji(message, replace=" ")
+    message = "".join(
+        char for char in message
+        if unicodedata.category(char) != "Cf" and char not in "\ufe0e\ufe0f"
+    )
+    return " ".join(message.split())
 
 
 def video_id(link: str) -> str:
@@ -63,7 +76,10 @@ def main() -> None:
     print("Connected to chat.\n", flush=True)
     while chat.is_alive():
         for c in chat.get().sync_items():
-            line = f"{c.author.name} says {c.message}"
+            message = speech_text(c.message)
+            if not message:
+                continue
+            line = f"{c.author.name} says {message}"
             print(line, flush=True)
             try:
                 asyncio.run(speak(line))

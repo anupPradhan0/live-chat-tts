@@ -11,6 +11,37 @@ import main
 
 
 class SpeechFailureTests(unittest.TestCase):
+    def test_removes_emoji_codes_and_unicode_sequences(self):
+        for message in (
+            ":grinning_squinting_face:", "\u200b\u200b😆", "👨‍👩‍👧‍👦 👍🏽 🇮🇳 1️⃣ ❤️",
+            ":yt-live-chat-custom_emoji:",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(main.speech_text(message), "")
+        self.assertEqual(
+            main.speech_text("Hello 😆 :grinning_squinting_face: world!"),
+            "Hello world!",
+        )
+        self.assertEqual(main.speech_text("Meet at 10:30 https://example.com"),
+                         "Meet at 10:30 https://example.com")
+
+    def test_emoji_only_messages_do_not_speak_author_name(self):
+        chat = Mock()
+        chat.is_alive.side_effect = [True, False]
+        chat.get.return_value.sync_items.return_value = [
+            SimpleNamespace(author=SimpleNamespace(name="@AtomMors"), message=message)
+            for message in (":grinning_squinting_face:", "\u200b😆", "Hi 😆")
+        ]
+        with (
+            patch.object(main.sys, "argv", ["live-chat", "https://youtube.com/watch?v=test"]),
+            patch.object(main.pytchat, "create", return_value=chat),
+            patch.object(main, "speak", new_callable=AsyncMock) as speak,
+            patch.object(main.time, "sleep"),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            main.main()
+            speak.assert_awaited_once_with("@AtomMors says Hi")
+
     def test_chat_continues_after_speech_handshake_failure(self):
         chat = Mock()
         chat.is_alive.side_effect = [True, False]
