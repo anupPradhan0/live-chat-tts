@@ -11,6 +11,8 @@ from pathlib import Path
 
 import edge_tts
 import pytchat
+from aiohttp import ClientError
+from edge_tts.exceptions import EdgeTTSException
 
 # ponytail: one voice; swap voice= if you want a different accent
 VOICE = "en-US-JennyNeural"
@@ -24,8 +26,8 @@ def video_id(link: str) -> str:
 
 
 async def speak(text: str) -> None:
-    path = Path(tempfile.mktemp(suffix=".mp3"))
-    try:
+    with tempfile.TemporaryDirectory(prefix="live-chat-tts-") as directory:
+        path = Path(directory) / "speech.mp3"
         await edge_tts.Communicate(text, VOICE).save(str(path))
         # volume=100 + 6dB boost so TTS stays louder than other apps
         subprocess.run(
@@ -37,10 +39,8 @@ async def speak(text: str) -> None:
                 "--af=volume=6dB",
                 str(path),
             ],
-            check=False,
+            check=True,
         )
-    finally:
-        path.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -65,7 +65,17 @@ def main() -> None:
         for c in chat.get().sync_items():
             line = f"{c.author.name} says {c.message}"
             print(line, flush=True)
-            asyncio.run(speak(line))
+            try:
+                asyncio.run(speak(line))
+            except (
+                ClientError, EdgeTTSException, asyncio.TimeoutError, OSError,
+                subprocess.CalledProcessError,
+            ) as e:
+                print(
+                    f"Speech failed ({type(e).__name__}); skipping message and continuing chat.",
+                    file=sys.stderr,
+                    flush=True,
+                )
         time.sleep(0.5)
 
     print("Chat ended (stream offline or finished).", flush=True)
